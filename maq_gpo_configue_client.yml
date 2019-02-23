@@ -1,0 +1,72 @@
+---
+- hosts: linux-clients
+  strategy: free
+  gather_facts: no
+  remote_user: root
+  tasks:
+  - name: Create App Directory
+    file:
+      path: /usr/local/sbin/keepup
+      state: directory
+      mode: 0755
+  - name: Copying Keepup Maq
+    copy:
+      src: /etc/ansible/gpo/files/keepup-maq.py
+      dest: /usr/local/sbin/keepup/keepup-maq.py
+      owner: root
+      group: root
+      mode: 0755
+  - name: Copying Keepup User
+    copy:
+      src: /etc/ansible/gpo/files/keepup-usr.py
+      dest: /usr/local/sbin/keepup/keepup-usr.py
+      owner: root
+      group: root
+      mode: 0755
+  - name: Configuring Skel Config Directories
+    file:
+      path: /etc/skel/.config/systemd/user
+      state: directory
+      mode: 0755
+  - copy:
+      src: /etc/ansible/gpo/files/keepup-usr.service
+      dest: /etc/skel/.config/systemd/user/
+      mode: 0755
+  - blockinfile:
+      path: /etc/skel/.bash_logout
+      marker: "# {mark} ANSIBLE MANAGED KEEPUP USR"
+      content: |
+        systemctl --user stop keepup-usr
+  - blockinfile:
+      path: /etc/skel/.profile
+      marker: "# {mark} ANSIBLE MANAGED KEEPUP USR"
+      content: |
+        systemctl --user daemon-reload
+        systemctl --user start keepup-usr
+  - name: Copying Keepup Maq System
+    copy:
+      src: /etc/ansible/gpo/files/keepup-maq.service
+      dest: /etc/systemd/system/
+      owner: root
+      group: root
+      mode: 0755
+  - name: Reload Systemd
+    systemd:
+      daemon_reload: yes
+  - name: Enable Service
+    systemd:
+      name: keepup-maq
+      enabled: yes
+  - name: Start Service
+    systemd:
+      state: started
+      name: keepup-maq
+  - name: Configuring Already created users
+    copy:
+      src: /etc/ansible/gpo/files/adjustprofile.sh
+      dest: /tmp/adjustprofile.sh
+      mode: 0770
+  - shell: bash /tmp/adjustprofile.sh
+  - file:
+      path: /tmp/adjustprofile.sh
+      state: absent
